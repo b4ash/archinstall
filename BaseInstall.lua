@@ -1,7 +1,7 @@
 --[[
 ======================= CAUTION /\ DANGER =======================
 The use of this script is only and exclusively for my laptop and my preferences.
-* ssd:sda
+* ssd:vda
 * locale:en_US
 * systemd-boot
 * luks2:cryptroot
@@ -21,10 +21,10 @@ ping -c3 archlinux.org
 efibootmgr
 efibootmgr -b # -B
 # Remove a key enrolled (tpm2)
-systemd-cryptenroll /dev/sda --wipe-slot=tpm2
+systemd-cryptenroll /dev/vda --wipe-slot=tpm2
 # Wipe LUKS header
-cryptsetup erase /dev/sda2
-wipefs -a /dev/sda
+cryptsetup erase /dev/vda2
+wipefs -a /dev/vda
 # Defrag ssd
 fstrim --all --minimum 1MiB --verbose
 # Modify fstab - note 04
@@ -45,13 +45,13 @@ end
 
 -- Variables
 local file_path, file, handle, output, uuid
-local pass_crypt = 'crypt_password'
+local pass_crypt = '123456'
 local timezone = 'America/Buenos_Aires'
-local pass_root = 'root_password'
-local user_name = 'user_name'
-local pass_user = 'user_password'
+local pass_root = 'root'
+local user_name = 'nesquik'
+local pass_user = 'user'
 local pkgs_base = 'base linux linux-firmware btrfs-progs intel-ucode neovim opendoas fish networkmanager'
-local myhostname = 'hostname'
+local myhostname = 'archvm'
 local btrfs_subvols = {'@', '@home', '@snapshots', '@var_cache', '@var_log', '@var_tmp', '@var_lib_flatpak', '@var_lib_libvirt'}
 
 -- 00. Change font size
@@ -61,17 +61,17 @@ run('setfont ter-132b')
 run('timedatectl set-ntp true')
 
 -- 01. Partition the disks
-run('sgdisk --zap-all /dev/sda')
-run('sgdisk --clear --set-alignment=2048 /dev/sda')
-run('sgdisk --new=1:0:+512M --typecode=1:ef00 --change-name=1:"EFIBOOT" /dev/sda')
-run('sgdisk --new=2:0:0 --typecode=2:8300 --change-name=2:"ROOT" /dev/sda')
+run('sgdisk --zap-all /dev/vda')
+run('sgdisk --clear --set-alignment=2048 /dev/vda')
+run('sgdisk --new=1:0:+512M --typecode=1:ef00 --change-name=1:"EFIBOOT" /dev/vda')
+run('sgdisk --new=2:0:0 --typecode=2:8300 --change-name=2:"ROOT" /dev/vda')
 
 -- 02. Encryption
-run(string.format('echo -e "YES\n%s\n%s" | cryptsetup --verbose --type luks2 --cipher aes-xts-plain64 --hash sha512 --iter-time 5000 --key-size 512 --pbkdf argon2id --use-urandom --verify-passphrase luksFormat /dev/sda2', pass_crypt, pass_crypt))
-run(string.format('echo "%s" | cryptsetup --allow-discards --persistent open /dev/sda2 cryptroot', pass_crypt))
+run(string.format('echo -e "YES\n%s\n%s" | cryptsetup --verbose --type luks2 --cipher aes-xts-plain64 --hash sha512 --iter-time 5000 --key-size 512 --pbkdf argon2id --use-urandom --verify-passphrase luksFormat /dev/vda2', pass_crypt, pass_crypt))
+run(string.format('echo "%s" | cryptsetup --allow-discards --persistent open /dev/vda2 cryptroot', pass_crypt))
 
 -- 03. Format the partitions
-run('mkfs.vfat -F32 -n "EFIBOOT" /dev/sda1')
+run('mkfs.vfat -F32 -n "EFIBOOT" /dev/vda1')
 run("mkfs.btrfs --label ROOT /dev/mapper/cryptroot")
 
 -- 04. Mount the file systems
@@ -90,7 +90,7 @@ for _, subvol in ipairs(btrfs_subvols) do
   run('mount --types btrfs -o subvol=' .. subvol .. ',defaults,ssd,nodiscard,compress-force=zstd:2,noatime,space_cache=v2,autodefrag /dev/mapper/cryptroot ' .. mount_point)
 end
 -- Mount EFI partition
-run('mount -t vfat /dev/sda1 /mnt/boot')
+run('mount -t vfat /dev/vda1 /mnt/boot')
 
 -- 05. Installation
 run('pacman-key --init')
@@ -179,7 +179,7 @@ else
   print('Error: Could not create file in ' .. file_path)
 end
 
-handle = io.popen('blkid -s UUID -o value /dev/sda2')
+handle = io.popen('blkid -s UUID -o value /dev/vda2')
 if handle then
   uuid = handle:read("*a"):gsub("\n", "")
   handle:close()
