@@ -68,17 +68,17 @@ run('setfont ter-132b', true)
 run('timedatectl set-ntp true', true)
 
 -- 01. Particionar discos
-run('sgdisk --zap-all /dev/sda', true)
-run('sgdisk --clear --set-alignment=2048 /dev/sda', true)
-run('sgdisk --new=1:0:+512M --typecode=1:ef00 --change-name=1:"EFIBOOT" /dev/sda', true)
-run('sgdisk --new=2:0:0 --typecode=2:8300 --change-name=2:"ROOT" /dev/sda', true)
+run('sgdisk --zap-all /dev/vda', true)
+run('sgdisk --clear --set-alignment=2048 /dev/vda', true)
+run('sgdisk --new=1:0:+512M --typecode=1:ef00 --change-name=1:"EFIBOOT" /dev/vda', true)
+run('sgdisk --new=2:0:0 --typecode=2:8300 --change-name=2:"ROOT" /dev/vda', true)
 
 -- 02. Cifrado
-run(string.format('echo -e "YES\n%s\n%s" | cryptsetup --verbose --type luks2 --cipher aes-xts-plain64 --hash sha512 --iter-time 5000 --key-size 512 --pbkdf argon2id --use-urandom --verify-passphrase luksFormat /dev/sda2', pass_crypt, pass_crypt), true)
-run(string.format('echo "%s" | cryptsetup --allow-discards --persistent open /dev/sda2 cryptroot', pass_crypt), true)
+run(string.format('echo -e "YES\n%s\n%s" | cryptsetup --verbose --type luks2 --cipher aes-xts-plain64 --hash sha512 --iter-time 5000 --key-size 512 --pbkdf argon2id --use-urandom --verify-passphrase luksFormat /dev/vda2', pass_crypt, pass_crypt), true)
+run(string.format('echo "%s" | cryptsetup --allow-discards --persistent open /dev/vda2 cryptroot', pass_crypt), true)
 
 -- 03. Formatear particiones
-run('mkfs.vfat -F32 -n "EFIBOOT" /dev/sda1', true)
+run('mkfs.vfat -F32 -n "EFIBOOT" /dev/vda1', true)
 run('mkfs.btrfs --label ROOT /dev/mapper/cryptroot', true)
 
 -- 04. Montar sistemas de archivos
@@ -92,7 +92,7 @@ for _, subvol in ipairs(btrfs_subvols) do
   local mount_point = subvol == '@' and '/mnt' or '/mnt/' .. subvol:sub(2)
   run('mount --types btrfs -o subvol=' .. subvol .. ',defaults,ssd,nodiscard,compress-force=zstd:2,noatime,space_cache=v2,autodefrag /dev/mapper/cryptroot ' .. mount_point, true)
 end
-run('mount -t vfat /dev/sda1 /mnt/boot', true)
+run('mount -t vfat /dev/vda1 /mnt/boot', true)
 
 -- 05. Instalación base
 run('pacman-key --init', true)
@@ -121,7 +121,7 @@ if file then
   file:write('default arch*\ntimeout 4\nconsole-mode auto\neditor no\n')
   file:close()
 end
-local handle = io.popen('blkid -s UUID -o value /dev/sda2')
+local handle = io.popen('blkid -s UUID -o value /dev/vda2')
 local uuid = handle and handle:read('*a'):gsub('\n', '') or error('No se pudo obtener el UUID')
 handle:close()
 file = io.open('/mnt/boot/loader/entries/arch.conf', 'w')
